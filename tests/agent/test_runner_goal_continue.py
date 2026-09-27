@@ -18,7 +18,7 @@ from nanobot.providers.base import LLMProvider, LLMResponse
 _MAX_TOOL_RESULT_CHARS = AgentDefaults().max_tool_result_chars
 
 
-def _continue_goal() -> str:
+async def _continue_goal() -> str:
     return "Continue working toward the active sustained goal."
 
 
@@ -66,7 +66,7 @@ async def test_runner_exits_normally_when_continuation_callback_returns_none():
         model="test-model",
         max_iterations=2,
         max_tool_result_chars=_MAX_TOOL_RESULT_CHARS,
-        continuation_callback=lambda: None,
+        continuation_callback=AsyncMock(return_value=None),
     ))
 
     assert result.stop_reason == "completed"
@@ -209,7 +209,7 @@ async def test_runner_injects_continuation_callback_message():
         model="test-model",
         max_iterations=2,
         max_tool_result_chars=_MAX_TOOL_RESULT_CHARS,
-        continuation_callback=lambda: custom_msg,
+        continuation_callback=AsyncMock(return_value=custom_msg),
     ))
 
     user_msgs = [m for m in result.messages if m.get("role") == "user"]
@@ -229,7 +229,7 @@ async def test_runner_resolves_continuation_callback_lazily():
     tools.get_definitions.return_value = []
     calls = {"n": 0}
 
-    def dynamic_msg() -> str:
+    async def dynamic_msg() -> str:
         calls["n"] += 1
         return "Goal (active):\nWrite the article draft."
 

@@ -39,7 +39,6 @@ def _isolate_sessions_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> I
     per ADR-0001), so without redirection tests would write into the real home.
     """
     runtime_root = tmp_path.parent / f"{tmp_path.name}-runtime-root"
-    legacy_root = tmp_path.parent / f"{tmp_path.name}-legacy-sessions-root"
 
     def runtime_subdir(name: str) -> Path:
         path = runtime_root / name
@@ -47,12 +46,8 @@ def _isolate_sessions_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> I
         return path
 
     monkeypatch.setattr(
-        "nanobot.session.manager.get_runtime_subdir",
+        "nanobot.session.location.get_runtime_subdir",
         runtime_subdir,
-    )
-    monkeypatch.setattr(
-        "nanobot.session.manager.get_legacy_sessions_dir",
-        lambda: legacy_root,
     )
     yield
 

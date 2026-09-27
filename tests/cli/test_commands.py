@@ -113,8 +113,13 @@ class _EmptyGatewaySessionManager:
     def list_sessions(self) -> list[dict[str, object]]:
         return []
 
-    def flush_all(self) -> int:
-        return 0
+    @property
+    def state(self):
+        return SimpleNamespace(
+            list_sessions=AsyncMock(return_value=[]),
+            record_delivery=AsyncMock(),
+            aclose=AsyncMock(),
+        )
 
 
 def test_gateway_signal_handler_first_signal_stops_and_second_forces() -> None:
@@ -2093,7 +2098,7 @@ def test_heartbeat_empty_response_is_not_evaluated(
     bus.publish_outbound = AsyncMock()
     seen: dict[str, object] = {}
 
-    class _FakeSessionManager:
+    class _FakeSessionManager(_EmptyGatewaySessionManager):
         def __init__(self, _workspace: Path) -> None:
             pass
 
@@ -3078,7 +3083,7 @@ def test_gateway_unbound_agent_cron_is_skipped(
         def add_message(self, role: str, content: str, **kwargs) -> None:
             self.messages.append({"role": role, "content": content, **kwargs})
 
-    class _FakeSessionManager:
+    class _FakeSessionManager(_EmptyGatewaySessionManager):
         def __init__(self, _workspace: Path) -> None:
             self.session = _FakeSession()
             seen["session_manager"] = self
@@ -3199,7 +3204,7 @@ def test_gateway_bound_cron_runs_as_session_turn(
     )
     monkeypatch.setattr("nanobot.bus.queue.MessageBus", lambda: bus)
 
-    class _FakeSessionManager:
+    class _FakeSessionManager(_EmptyGatewaySessionManager):
         def __init__(self, _workspace: Path) -> None:
             pass
 
@@ -3414,7 +3419,7 @@ def test_gateway_local_trigger_queue_submits_agent_turns(
     class _FakeContext:
         memory = _FakeMemory()
 
-    class _FakeSessionManager:
+    class _FakeSessionManager(_EmptyGatewaySessionManager):
         def flush_all(self) -> int:
             return 0
 
@@ -3692,7 +3697,7 @@ def test_gateway_health_endpoint_binds_and_serves_expected_responses(
     config.gateway.port = 18791
     captured: dict[str, object] = {}
 
-    class _FakeSessionManager:
+    class _FakeSessionManager(_EmptyGatewaySessionManager):
         def flush_all(self) -> int:
             return 0
 
@@ -3895,7 +3900,7 @@ def test_gateway_agent_task_owns_initial_mcp_provider_close(
     config.gateway.port = 18791
     seen: dict[str, object] = {}
 
-    class _FakeSessionManager:
+    class _FakeSessionManager(_EmptyGatewaySessionManager):
         def flush_all(self) -> int:
             return 0
 
@@ -4035,7 +4040,7 @@ def test_gateway_shutdown_event_exits_forever_runtime_tasks(
     seen: dict[str, object] = {}
     shutdown_order: list[str] = []
 
-    class _FakeSessionManager:
+    class _FakeSessionManager(_EmptyGatewaySessionManager):
         def flush_all(self) -> int:
             return 0
 
