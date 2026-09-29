@@ -121,6 +121,7 @@ class WebUICommandTransport(Protocol):
         is_dm: bool,
         session_key: str | None,
         require_existing_session: bool,
+        session_generation: str | None,
     ) -> None: ...
 
     async def send_session_updated(
@@ -330,7 +331,7 @@ class WebUICommandRouter:
             return
         if command_type == "new_temporary_chat":
             try:
-                new_id = self._temporary_chats.create(
+                new_id = await self._temporary_chats.create(
                     connection,
                     trusted_webui=connection in self._webui_connections,
                 )
@@ -636,8 +637,7 @@ class WebUICommandRouter:
             metadata["mcp_presets"] = mcp_presets
         session_mentions: list[SessionMention] = []
         if trusted_webui and self._session_access is not None:
-            session_mentions = await asyncio.to_thread(
-                self._session_access.normalize_mentions,
+            session_mentions = await self._session_access.normalize_mentions(
                 envelope.get("session_mentions"),
                 exclude_session_key=webui_session_key(chat_id),
             )
@@ -652,7 +652,24 @@ class WebUICommandRouter:
                 metadata[WEBSOCKET_TURN_OWNER_METADATA_KEY] = queued_owner
 
         accepted = False
+        admission_session_key = (
+            temporary_policy.session_key
+            if temporary_policy is not None
+            else webui_session_key(chat_id)
+        )
+        session_generation: str | None = None
+        session_created = False
         try:
+            session_generation, session_created = await self._workspaces.persist_scope(
+                chat_id,
+                scope,
+                session_key=admission_session_key,
+                expected_generation=(
+                    temporary_policy.session_generation
+                    if temporary_policy is not None
+                    else None
+                ),
+            )
             if is_webui and (
                 temporary_policy is None or temporary_policy.persist_transcript
             ):
@@ -697,9 +714,16 @@ class WebUICommandRouter:
                     if temporary_policy is not None
                     else False
                 ),
+                session_generation=session_generation,
             )
-            await self._workspaces.persist_scope(chat_id, scope)
             accepted = True
+        except BaseException:
+            await self._workspaces.rollback_scope_admission(
+                admission_session_key,
+                session_generation,
+                created=session_created,
+            )
+            raise
         finally:
             if not accepted and queued_owner is not None:
                 clear_websocket_turn_if_current(chat_id, queued_owner)
